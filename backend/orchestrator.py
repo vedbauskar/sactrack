@@ -125,7 +125,7 @@ def transform_course(course):
         'meeting_days': ','.join(meeting_days) if meeting_days else None,
         'meeting_time_start': meeting.get('beginTime'),
         'meeting_time_end': meeting.get('endTime'),
-        'meeting_building': meeting.get('building'),
+        'meeting_building': meeting.get('buildingDescription'),
         'meeting_room': meeting.get('room'),
         'start_date': meeting.get('startDate'),
         'end_date': meeting.get('endDate'),

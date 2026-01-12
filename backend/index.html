@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mt. SAC Course Search</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Mt. SAC Course Search</h1>
+            <p class="subtitle">yo gurt</p>
+        </header>
+
+        <div class="search-container">
+            <input 
+                type="text" 
+                id="searchInput" 
+                placeholder="Search by course name, subject, instructor, or CRN..."
+                autocomplete="off"
+            >
+            <div class="search-icon">🔍</div>
+        </div>
+
+        <div class="filters">
+            <select id="termFilter">
+                <option value="">All Terms</option>
+            </select>
+            <select id="subjectFilter">
+                <option value="">All Subjects</option>
+            </select>
+            <button id="clearFilters" class="btn-secondary">Clear Filters</button>
+        </div>
+
+        <div class="main-content">
+            <div class="courses-panel">
+                <div class="panel-header">
+                    <h2>Courses</h2>
+                    <span id="courseCount" class="badge">0 courses</span>
+                </div>
+                <div id="loadingIndicator" class="loading">Loading courses...</div>
+                <div id="coursesList" class="courses-list"></div>
+            </div>
+
+            <div class="details-panel" id="detailsPanel">
+                <div class="panel-header">
+                    <h2>Course Details</h2>
+                    <button id="closeDetails" class="close-btn">×</button>
+                </div>
+                <div id="courseDetails" class="course-details-content">
+                    <p class="placeholder">Select a course to view details</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>

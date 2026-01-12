@@ -89,7 +89,7 @@ def search_all_courses_direct(term_code):
         response = session.post(search_url, data=form_data, headers=headers)
         data = response.json()
         
-        courses = data.get('data', [])
+        courses = data.get('data') or []
         total_count = data.get('totalCount', 0)
         
         # If there are more courses than page size, we need to paginate
@@ -101,6 +101,66 @@ def search_all_courses_direct(term_code):
     except Exception as e:
         print(f"  ⚠️  Direct search failed: {e}")
         return []
+
+def fetch_course_description(term_code, crn, session=None, headers=None):
+    """
+    Fetch course description and prerequisites for a specific course.
+    Returns a dictionary with 'description' and 'prerequisites' keys.
+    """
+    base_url = "https://prodrg.mtsac.edu/StudentRegistrationSsb/ssb"
+    
+    # Create session if not provided
+    if session is None or headers is None:
+        session, headers = setup_session(term_code, base_url)
+    
+    desc_url = f"{base_url}/searchResults/getCourseDescription"
+    params = {
+        'term': term_code,
+        'courseReferenceNumber': crn
+    }
+    
+    try:
+        response = session.get(desc_url, params=params, headers=headers)
+        html = response.text
+        
+        # Parse the HTML to extract description and prerequisites
+        # The format is: <b>Advisory/Prerequisite:</b><i>prereq text</i>description text
+        import re
+        
+        description = ""
+        prerequisites = None
+        
+        # Remove HTML tags but keep the text
+        # Look for Advisory or Prerequisite sections
+        prereq_match = re.search(r'&lt;b&gt;(Advisory|Prerequisite|Corequisite):?\s*&lt;/b&gt;&lt;i&gt;(.*?)&lt;/i&gt;', html, re.IGNORECASE | re.DOTALL)
+        
+        if prereq_match:
+            prerequisites = prereq_match.group(2).strip()
+            # Remove the prerequisite section from the html to get clean description
+            html = html.replace(prereq_match.group(0), '')
+        
+        # Extract the description (remove all HTML tags)
+        desc_clean = re.sub(r'&lt;.*?&gt;', '', html)
+        desc_clean = re.sub(r'<.*?>', '', desc_clean)
+        desc_clean = re.sub(r'\s+', ' ', desc_clean).strip()
+        
+        # Remove common phrases that aren't part of the actual description
+        desc_clean = re.sub(r'(display course description|if there is a section description.*?|when there is no course.*?)', '', desc_clean, flags=re.IGNORECASE)
+        desc_clean = desc_clean.strip()
+        
+        if desc_clean and desc_clean not in ['', 'None', 'N/A']:
+            description = desc_clean
+        
+        return {
+            'description': description if description else None,
+            'prerequisites': prerequisites
+        }
+    except Exception as e:
+        print(f"  ⚠️  Error fetching description for CRN {crn}: {e}")
+        return {
+            'description': None,
+            'prerequisites': None
+        }
 
 def scrape_all_courses(term_code, max_workers=5):
     """

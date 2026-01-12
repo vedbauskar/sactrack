@@ -82,7 +82,7 @@ def generate_future_terms(years_ahead=2):
     terms.sort(key=lambda x: x['code'])
     return terms
 
-def transform_course(course):
+def transform_course(course, fetch_details=True):
     """Transform course data to match database schema"""
     instructor_name = 'TBA'
     instructor_email = None
@@ -101,7 +101,15 @@ def transform_course(course):
     if meeting.get('thursday'): meeting_days.append('R')
     if meeting.get('friday'): meeting_days.append('F')
     
-    return {
+    # Check for UC Credit Limitation in section attributes
+    has_uc_credit_limitation = False
+    if course.get('sectionAttributes'):
+        for attr in course['sectionAttributes']:
+            if attr.get('code') == 'UCCL' or 'UC Credit Limitation' in attr.get('description', ''):
+                has_uc_credit_limitation = True
+                break
+    
+    transformed = {
         'crn': course.get('courseReferenceNumber'),
         'term': course.get('term'),
         'term_desc': course.get('termDesc'),
@@ -129,10 +137,15 @@ def transform_course(course):
         'meeting_room': meeting.get('room'),
         'start_date': meeting.get('startDate'),
         'end_date': meeting.get('endDate'),
+        'has_uc_credit_limitation': has_uc_credit_limitation,
+        'prerequisites': None,  # Will be filled in if fetch_details=True
+        'course_description': None,  # Will be filled in if fetch_details=True
         'updated_at': datetime.now().isoformat()
     }
+    
+    return transformed
 
-def upload_courses_to_supabase(courses, term_code):
+def upload_courses_to_supabase(courses, term_code, fetch_descriptions=True):
     """Upload transformed courses to Supabase"""
     if not courses:
         print(f"  ⚠️  No courses to upload for term {term_code}")
@@ -155,6 +168,43 @@ def upload_courses_to_supabase(courses, term_code):
     if not transformed:
         print(f"  ⚠️  No valid courses to upload after transformation")
         return 0, transform_errors
+    
+    # Fetch descriptions and prerequisites if requested
+    if fetch_descriptions:
+        print(f"  📖 Fetching course descriptions and prerequisites...")
+        from scraper import fetch_course_description, setup_session
+        import time
+        
+        # Create a session for fetching descriptions
+        base_url = "https://prodrg.mtsac.edu/StudentRegistrationSsb/ssb"
+        session, headers = setup_session(term_code, base_url)
+        
+        desc_fetch_errors = 0
+        for i, course_data in enumerate(transformed):
+            try:
+                # Rate limiting - small delay to avoid overwhelming server
+                if i > 0 and i % 20 == 0:
+                    time.sleep(0.5)
+                    print(f"    Fetched {i}/{len(transformed)} descriptions...")
+                
+                desc_info = fetch_course_description(
+                    term_code, 
+                    course_data['crn'],
+                    session=session,
+                    headers=headers
+                )
+                
+                course_data['course_description'] = desc_info.get('description')
+                course_data['prerequisites'] = desc_info.get('prerequisites')
+                
+            except Exception as e:
+                desc_fetch_errors += 1
+                if desc_fetch_errors < 5:  # Only print first few errors
+                    print(f"    ⚠️  Error fetching description for CRN {course_data['crn']}: {e}")
+        
+        if desc_fetch_errors > 0:
+            print(f"    ⚠️  {desc_fetch_errors} courses failed to fetch descriptions")
+        print(f"    ✓ Fetched descriptions for {len(transformed) - desc_fetch_errors} courses")
     
     print(f"  💾 Uploading {len(transformed)} courses to Supabase...")
     batch_size = 100
